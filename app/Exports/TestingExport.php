@@ -2,7 +2,6 @@
 
 namespace App\Exports;
 
-use App\Http\Controllers\ProbabLabel;
 use App\Models\Atribut;
 use App\Models\NilaiAtribut;
 use App\Models\TestingData;
@@ -19,8 +18,9 @@ implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStrict
 	{
 		$col[] = '#';
 		$col[] = "Nama";
+		$col[] = "ID Pelanggan";
+		$col[] = "Daya Terpasang";
 		foreach (Atribut::get() as $value) $col[] = $value->name;
-		$col[] = "Status";
 		return $col;
 	}
 	/**
@@ -34,13 +34,14 @@ implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStrict
 	{
 		$row[] = $test->id;
 		$row[] = $test->nama;
+		$row[] = $test->id_pelanggan;
+		$row[] = $test->daya_terpasang;
 		foreach (Atribut::get() as $val) {
 			if ($val->type === 'categorical') {
 				$foreign = NilaiAtribut::firstWhere('id', $test[$val->slug]);
 				$row[] = $foreign->name;
 			} else $row[] = $test[$val->slug];
 		}
-		$row[] = ProbabLabel::$label[$test->status];
 		return $row;
 	}
 }

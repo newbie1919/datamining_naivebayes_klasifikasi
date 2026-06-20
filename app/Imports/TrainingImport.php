@@ -13,6 +13,16 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 
 class TrainingImport implements ToModel, WithHeadingRow, WithValidation
 {
+	public function prepareForValidation($data, $index)
+	{
+		$data['id_pelanggan'] = isset($data['id_pelanggan'])
+			? (string) $data['id_pelanggan']
+			: null;
+		$data['daya_terpasang'] = isset($data['daya_terpasang'])
+			? (int) $data['daya_terpasang']
+			: null;
+		return $data;
+	}
 	/**
 	 * @param array $row
 	 *
@@ -22,6 +32,8 @@ class TrainingImport implements ToModel, WithHeadingRow, WithValidation
 	{
 		$rows = [];
 		$rows['nama'] = ucfirst($row['nama']);
+		$rows['id_pelanggan'] = strtoupper(trim((string) ($row['id_pelanggan'] ?? '')));
+		$rows['daya_terpasang'] = (int) ($row['daya_terpasang'] ?? 0);
 		foreach (Atribut::get() as $attr) {
 			if ($attr->type === 'categorical') {
 				if (empty($row[$attr->slug])) $row[$attr->slug] = null;
@@ -40,11 +52,22 @@ class TrainingImport implements ToModel, WithHeadingRow, WithValidation
 			strtolower(trim($row['status'])),
 			array_map('strtolower', ProbabLabel::$label)
 		);
+
+		$existing = TrainingData::where('id_pelanggan', $rows['id_pelanggan'])
+			->where('daya_terpasang', $rows['daya_terpasang'])
+			->first();
+		if ($existing) {
+			$existing->fill($rows);
+			$existing->save();
+			return null;
+		}
 		return new TrainingData($rows);
 	}
 	public function rules(): array
 	{
 		$rules['nama'] = ['bail', 'required', 'string'];
+		$rules['id_pelanggan'] = ['bail', 'required', 'string', 'max:50'];
+		$rules['daya_terpasang'] = ['bail', 'required', 'integer', 'min:1'];
 		foreach (Atribut::get() as $attr) {
 			if ($attr->type === 'categorical')
 				$rules[$attr->slug] = ['nullable', 'string'];

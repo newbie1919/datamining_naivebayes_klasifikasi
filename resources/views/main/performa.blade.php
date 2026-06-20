@@ -1,6 +1,14 @@
 @extends('layout')
 @section('title', 'Performa')
 @section('content')
+<div class="btn-group mb-3" role="group">
+	<a href="{{ route('result.export.csv') }}" class="btn btn-success">
+		<i class="fas fa-file-csv"></i> Ekspor CSV
+	</a>
+	<a href="{{ route('result.export.pdf') }}" class="btn btn-danger" target="_blank" rel="noopener">
+		<i class="fas fa-file-pdf"></i> Laporan PDF
+	</a>
+</div>
 <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
 	<li class="nav-item" role="presentation">
 		<button @class(['nav-link','active'=>$data['test']['total']>0]) id="pills-testing-tab"
@@ -22,6 +30,11 @@
 <div class="tab-content" id="pills-tabContent">
 	<div class="tab-pane fade @if($data['test']['total']>0) show active @endif " id="pills-testing"
 		role="tabpanel" aria-labelledby="pills-testing-tab" tabindex="0">
+		@if($data['test']['total']===0)
+		<div class="alert alert-info mb-3">
+			Performa testing belum tersedia karena data testing belum memiliki label aktual.
+		</div>
+		@endif
 		<div class="card mb-3">
 			<div class="card-header"><b>Performa Klasifikasi Data Testing</b></div>
 			<div class="card-body">
@@ -133,6 +146,43 @@
 							</div>
 						</div>
 					</div>
+				</div>
+			</div>
+		</div>
+		<div class="card mb-3">
+			<div class="card-header"><b>Detail Prediksi vs Aktual (Data Testing)</b></div>
+			<div class="card-body">
+				<div class="table-responsive">
+					<table class="table table-bordered">
+						<thead>
+							<tr>
+								<th>#</th>
+								<th>ID Pelanggan</th>
+								<th>Nama</th>
+								<th>Prediksi</th>
+								<th>Aktual</th>
+								<th>Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							@forelse($detailTest as $row)
+							<tr>
+								<td>{{ $loop->iteration }}</td>
+								<td>{{ $row->id_pelanggan }}</td>
+								<td>{{ $row->name }}</td>
+								<td>{{ $stat[$row->predicted] }}</td>
+								<td>{{ $stat[$row->real] }}</td>
+								<td class="{{ $row->predicted == $row->real ? 'table-success' : 'table-danger' }}">
+									{{ $row->predicted == $row->real ? 'Benar' : 'Salah' }}
+								</td>
+							</tr>
+							@empty
+							<tr>
+								<td colspan="6" class="text-center">Belum ada data hasil klasifikasi testing.</td>
+							</tr>
+							@endforelse
+						</tbody>
+					</table>
 				</div>
 			</div>
 		</div>

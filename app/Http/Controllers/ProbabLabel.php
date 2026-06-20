@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Atribut;
 use App\Models\Classification;
+use App\Models\NilaiAtribut;
 use App\Models\Probability;
 use App\Models\TrainingData;
 use App\Models\TestingData;
@@ -45,76 +46,75 @@ class ProbabLabel extends Controller
 	}
 	public static function hitungProbab($data)
 	{ //Proses perhitungan klasifikasi
+		$detail = self::explainProbab($data);
+		return [
+			'true' => $detail['posterior']['true'],
+			'false' => $detail['posterior']['false'],
+			'predict' => $detail['predict']
+		];
+	}
+	public static function explainProbab($data): array
+	{
 		$semuadata = TrainingData::count();
-
-		/**==================================================
-		 * PRIOR
-		 * ==================================================
-		 * Jumlah Probabilitas berlabel Layak dan Tidak Layak
-		 */ $prior = Probability::probabKelas();
-
-		/**=====================================================================
-		 * LIKELIHOOD & EVIDENCE
-		 * =====================================================================
-		 * Likelihood: Jumlah probabilitas dari label Layak dan Tidak Layak
-		 * Evidence: Jumlah probabilitas total
-		 *
-		 * Likelihood dan Evidence diberi nilai 1 untuk perkalian
-		 */ $likelihood['true'] = $likelihood['false'] = $evidence = 1;
+		$prior = Probability::probabKelas(); //Prior
+		$likelihood['true'] = $likelihood['false'] = $evidence = 1;
+		$steps = [];
 		foreach (Atribut::get() as $at) {
 			if ($at->type === 'categorical') {
-				//Jika Kategorikal, nilai probabilitas yang dicari
-				$probabilitas = Probability::firstWhere(
-					'nilai_atribut_id',
-					$data[$at->slug]
-				);
+				$probabilitas = Probability::firstWhere('nilai_atribut_id', $data[$at->slug]);
+				$nilai = NilaiAtribut::find($data[$at->slug]);
 				$probabs = [
-					'true' => json_decode($probabilitas->true),
-					'false' => json_decode($probabilitas->false)
+					'true' => json_decode($probabilitas->true ?? '0'),
+					'false' => json_decode($probabilitas->false ?? '0')
 				];
 				$likelihood['true'] *= $probabs['true'];
 				$likelihood['false'] *= $probabs['false'];
-				$evidence *= TrainingData::where($at->slug, $data[$at->slug])->count() /
-					$semuadata;
-			} else { //Jika Numerik, Normal Distribution yang dicari
+				$evidencePart = $semuadata === 0 ? 0 :
+					TrainingData::where($at->slug, $data[$at->slug])->count() / $semuadata;
+				$evidence *= $evidencePart;
+				$steps[] = [
+					'atribut' => $at->name,
+					'type' => 'categorical',
+					'input' => $nilai->name ?? '-',
+					'input_raw' => $data[$at->slug],
+					'prob_true' => $probabs['true'],
+					'prob_false' => $probabs['false']
+				];
+			} else {
 				$probabilitas = Probability::where('atribut_id', $at->id)
 					->whereNull('nilai_atribut_id')->first();
-				// if($probabilitas===null) continue;
-				$trues = json_decode($probabilitas->true);
-				$falses = json_decode($probabilitas->false);
-				$total = json_decode($probabilitas->total);
-				$likelihood['true'] *= self::normalDistribution(
-					$data[$at->slug],
-					$trues->sd,
-					$trues->mean
-				);
-				$likelihood['false'] *= self::normalDistribution(
-					$data[$at->slug],
-					$falses->sd,
-					$falses->mean
-				);
-				$evidence *= self::normalDistribution(
-					$data[$at->slug],
-					$total->sd,
-					$total->mean
-				);
+				$trues = json_decode($probabilitas->true ?? '{"mean":0,"sd":0}');
+				$falses = json_decode($probabilitas->false ?? '{"mean":0,"sd":0}');
+				$total = json_decode($probabilitas->total ?? '{"mean":0,"sd":0}');
+				$lhTrue = self::normalDistribution($data[$at->slug], $trues->sd, $trues->mean);
+				$lhFalse = self::normalDistribution($data[$at->slug], $falses->sd, $falses->mean);
+				$evidencePart = self::normalDistribution($data[$at->slug], $total->sd, $total->mean);
+				$likelihood['true'] *= $lhTrue;
+				$likelihood['false'] *= $lhFalse;
+				$evidence *= $evidencePart;
+				$steps[] = [
+					'atribut' => $at->name,
+					'type' => 'numeric',
+					'input' => $data[$at->slug],
+					'prob_true' => $lhTrue,
+					'prob_false' => $lhFalse,
+					'mean_true' => $trues->mean,
+					'sd_true' => $trues->sd,
+					'mean_false' => $falses->mean,
+					'sd_false' => $falses->sd
+				];
 			}
 		}
-
-		/**====================================================
-		 * POSTERIOR
-		 * ====================================================
-		 * Rumus: Prior dikali Likelihood, lalu dibagi Evidence
-		 * Jika Evidence 0, maka nilai posteriornya 0
-		 */
-		$posterior = [
-			'true' => ($prior['true'] * $likelihood['true']) / $evidence,
-			'false' => ($prior['false'] * $likelihood['false']) / $evidence
+		$posterior = [ //Posterior
+			'true' => $evidence == 0 ? 0 : ($prior['true'] * $likelihood['true']) / $evidence,
+			'false' => $evidence == 0 ? 0 : ($prior['false'] * $likelihood['false']) / $evidence
 		];
 		return [
-			'true' => $posterior['true'],
-			'false' => $posterior['false'],
-			'predict' => $posterior['true'] >= $posterior['false']
+			'prior' => $prior,
+			'likelihood' => $likelihood,
+			'posterior' => $posterior,
+			'predict' => $posterior['true'] >= $posterior['false'],
+			'steps' => $steps
 		];
 	}
 	public static function resetProbab(): void
@@ -122,8 +122,9 @@ class ProbabLabel extends Controller
 		if (Probability::count() > 0) Probability::truncate();
 		if (Classification::count() > 0) Classification::truncate();
 	}
-	private static function normalDistribution(int $x, float $sd, float $mean)
+	public static function normalDistribution(int|float $x, float|int $sd, float|int $mean)
 	{
+		if ((float) $sd == 0.0) return (float) $x == (float) $mean ? 1.0 : 0.0;
 		return (1 / ($sd * sqrt(2 * pi()))) * exp(-0.5 * pow(($x - $mean) / $sd, 2));
 	}
 	/**

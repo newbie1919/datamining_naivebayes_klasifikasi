@@ -26,6 +26,8 @@ implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStrictNullC
 		return array(
 			'#',
 			'Nama',
+			'ID Pelanggan',
+			'Daya Terpasang',
 			ProbabLabel::$label[true],
 			ProbabLabel::$label[false],
 			'Kelas Prediksi',
@@ -46,10 +48,12 @@ implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStrictNullC
 		return array(
 			++$this->index,
 			$class->name,
+			$class->id_pelanggan,
+			$class->daya_terpasang,
 			$class->true ?? 0.00,
 			$class->false ?? 0.00,
 			ProbabLabel::$label[$class->predicted],
-			ProbabLabel::$label[$class->real]
+			is_null($class->real) ? '-' : ProbabLabel::$label[$class->real]
 		);
 	}
 }

@@ -11,9 +11,11 @@ class TestingData extends Model
 	protected $guarded = ['id', 'created_at', 'updated_at'];
 	public static array $rules = [
 		'nama' => ['bail', 'required', 'string'],
+		'id_pelanggan' => ['bail', 'required', 'string', 'max:50'],
+		'daya_terpasang' => ['bail', 'nullable', 'integer', 'min:1'],
 		'q' => 'required',
 		'q.*' => ['bail', 'required', 'numeric'],
-		'status' => ['bail', 'required', 'in:1,0,true,false,auto']
+		'status' => ['bail', 'nullable', 'in:1,0,true,false,auto']
 	], $filerule = [
 		'data' => [
 			'bail',

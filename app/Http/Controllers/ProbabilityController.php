@@ -7,6 +7,7 @@ use App\Models\Classification;
 use App\Models\NilaiAtribut;
 use App\Models\Probability;
 use App\Models\TrainingData;
+use App\Support\ActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 
@@ -112,12 +113,14 @@ class ProbabilityController extends Controller
 			//Likelihood End
 
 			if ($pre === false) {
+				ActivityLogger::log('probability.calculated', 'Menghitung probabilitas model', Probability::class);
 				return back()->withWarning(
 					'Probabilitas berhasil dihitung, tetapi terjadi kesalahan pada preprocessing.'
 				);
 			} else if ($pre > 0)
 				$msg = "Probabilitas berhasil dihitung. Preprocessing sudah dilakukan.";
 			else $msg = "Probabilitas berhasil dihitung";
+			ActivityLogger::log('probability.calculated', 'Menghitung probabilitas model', Probability::class);
 			return back()->withSuccess($msg);
 		} catch (QueryException $e) {
 			Log::error($e);
@@ -133,6 +136,7 @@ class ProbabilityController extends Controller
 		try {
 			Probability::truncate();
 			Classification::truncate();
+			ActivityLogger::log('probability.reset', 'Mereset probabilitas dan hasil klasifikasi', Probability::class);
 			return back()->withSuccess('Perhitungan probabilitas sudah direset');
 		} catch (QueryException $e) {
 			return back()->withError('Gagal reset:')->withErrors($e);

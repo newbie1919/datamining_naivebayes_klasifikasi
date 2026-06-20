@@ -9,6 +9,7 @@ use App\Models\Classification;
 use App\Models\NilaiAtribut;
 use App\Models\Probability;
 use App\Models\TestingData;
+use App\Support\ActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -27,12 +28,19 @@ class TestingDataController extends Controller
 	{ //Upload Data Testing
 		$request->validate(TestingData::$filerule);
 		Excel::import(new TestingImport, request()->file('data'));
+		ActivityLogger::log('testing.imported', 'Mengunggah data testing baru', TestingData::class, [
+			'filename' => $request->file('data')?->getClientOriginalName(),
+		]);
 		return response()->json(['message' => 'Berhasil diimpor']);
 	}
 	public function count()
-	{ //Tampilkan jumlah nilai yang hilang dan data dengan nama duplikat
+	{ //Tampilkan jumlah nilai yang hilang dan data duplikat berdasarkan ID pelanggan
 		$test = TestingData::get();
-		$testUnique = $test->unique(['nama']);
+		$testUnique = $test->unique(function ($item) {
+			if (empty($item->id_pelanggan))
+				return 'legacy-' . $item->id;
+			return strtolower(trim($item->id_pelanggan));
+		});
 		$empty = 0;
 		foreach (Atribut::get() as $attr)
 			$empty += TestingData::whereNull($attr->slug)->count();
@@ -45,15 +53,13 @@ class TestingDataController extends Controller
 	{
 		$atribut = Atribut::get();
 		if (count($atribut) === 0) {
-			return to_route('atribut.index')
-				->withWarning('Tambahkan Atribut dulu sebelum menginput Dataset');
+			return to_route('home')
+				->withWarning('Admin perlu menambahkan atribut sebelum data testing dapat diinput');
 		}
 		$nilai = NilaiAtribut::get();
-		$calculated = Probability::count();
-		$hasil = ProbabLabel::$label;
 		return view(
 			'main.dataset.testing',
-			compact('atribut', 'nilai', 'calculated', 'hasil')
+			compact('atribut', 'nilai')
 		);
 	}
 	/**
@@ -70,9 +76,6 @@ class TestingDataController extends Controller
 				});
 			}
 		}
-		$dt->editColumn('status', function (TestingData $test) {
-			return ProbabLabel::$label[$test->status];
-		});
 		return $dt->make();
 	}
 	/**
@@ -84,6 +87,20 @@ class TestingDataController extends Controller
 			$request->validate(TestingData::$rules);
 			foreach ($request->q as $id => $q) $req[$id] = $q;
 			$req['nama'] = ucfirst($request->nama);
+			$req['id_pelanggan'] = strtoupper(trim($request->id_pelanggan));
+			$req['daya_terpasang'] = $request->filled('daya_terpasang') ? (int) $request->daya_terpasang : null;
+
+			$duplikat = TestingData::where('id_pelanggan', $req['id_pelanggan']);
+			if (!empty($request->id)) $duplikat->where('id', '!=', $request->id);
+			if ($duplikat->exists()) {
+				return response()->json([
+					'message' => 'ID Pelanggan sudah digunakan',
+					'errors' => [
+						'id_pelanggan' => ['ID Pelanggan sudah digunakan']
+					]
+				], 422);
+			}
+
 			if ($request->status === 'auto') {
 				if (Probability::count() === 0) {
 					return response()->json([
@@ -92,12 +109,18 @@ class TestingDataController extends Controller
 				}
 				$hasil = ProbabLabel::hitungProbab($req);
 				$req['status'] = $hasil['predict'];
-			} else $req['status'] = $request->status;
+			} elseif ($request->filled('status')) {
+				$req['status'] = filter_var($request->status, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+			} else {
+				$req['status'] = null;
+			}
 			if (!empty($request->id)) {
-				TestingData::updateOrCreate(['id' => $request->id], $req);
+				$data = TestingData::updateOrCreate(['id' => $request->id], $req);
+				ActivityLogger::log('testing.updated', 'Mengubah data testing ' . $data->id_pelanggan, $data);
 				return response()->json(['message' => 'Berhasil diedit']);
 			} else {
-				TestingData::create($req);
+				$data = TestingData::create($req);
+				ActivityLogger::log('testing.created', 'Menambahkan data testing ' . $data->id_pelanggan, $data);
 				return response()->json(['message' => 'Berhasil disimpan']);
 			}
 		} catch (QueryException $e) {
@@ -117,8 +140,11 @@ class TestingDataController extends Controller
 	 */
 	public function destroy(TestingData $testing)
 	{
-		Classification::where('name', $testing->nama)->where('type', 'test')
+		Classification::where('type', 'test')
+			->where('id_pelanggan', $testing->id_pelanggan)
+			->where('daya_terpasang', $testing->daya_terpasang)
 			->delete();
+		ActivityLogger::log('testing.deleted', 'Menghapus data testing ' . $testing->id_pelanggan, $testing);
 		$testing->delete();
 		return response()->json(['message' => 'Berhasil dihapus']);
 	}
@@ -127,6 +153,7 @@ class TestingDataController extends Controller
 		try {
 			Classification::where('type', 'test')->delete();
 			TestingData::truncate();
+			ActivityLogger::log('testing.cleared', 'Menghapus seluruh data testing', TestingData::class);
 			return response()->json(['message' => 'Berhasil dihapus']);
 		} catch (QueryException $e) {
 			Log::error($e);

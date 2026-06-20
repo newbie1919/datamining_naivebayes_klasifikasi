@@ -6,6 +6,7 @@ use App\Models\Atribut;
 use App\Models\NilaiAtribut;
 use App\Models\TrainingData;
 use App\Models\TestingData;
+use App\Support\ActivityLogger;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -66,11 +67,13 @@ class AtributController extends Controller
 				]);
 				if ($req['type'] === 'numeric' && $atribut->type === 'categorical')
 					NilaiAtribut::where('atribut_id', $request->id)->delete();
+				ActivityLogger::log('attribute.updated', 'Mengubah atribut ' . $req['name'], $atribut);
 				return response()->json(['message' => 'Berhasil diedit']);
 			} else {
 				$this->addColumn('training_data', $req);
 				$this->addColumn('testing_data', $req);
-				Atribut::create($req);
+				$atribut = Atribut::create($req);
+				ActivityLogger::log('attribute.created', 'Menambahkan atribut ' . $req['name'], $atribut);
 				return response()->json(['message' => 'Berhasil disimpan']);
 			}
 		} catch (QueryException $e) {
@@ -101,6 +104,7 @@ class AtributController extends Controller
 		$this->delColumn('training_data', $atribut);
 		$this->delColumn('testing_data', $atribut);
 		// NilaiAtribut::where('atribut_id',$atribut->id)->delete();
+		ActivityLogger::log('attribute.deleted', 'Menghapus atribut ' . $atribut->name, $atribut);
 		$atribut->delete();
 		return response()->json(['message' => "Berhasil dihapus"]);
 	}

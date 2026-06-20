@@ -19,6 +19,12 @@
 						<label for="trainName">Nama</label>
 						<div class="invalid-feedback" id="name-error"></div>
 					</div>
+					<div class="form-floating mb-3">
+						<input type="text" class="form-control" id="trainCustomerId" name="id_pelanggan"
+							placeholder="ID Pelanggan" required />
+						<label for="trainCustomerId">ID Pelanggan</label>
+						<div class="invalid-feedback" id="id-pelanggan-error"></div>
+					</div>
 					@foreach ($atribut as $attr)
 					<div class="form-floating mb-3" data-bs-toggle="tooltip" title="{{$attr->desc}}">
 						@if ($attr->type==='numeric')
@@ -122,7 +128,7 @@
 		<div class="card">
 			<div class="card-body">
 				<div class="d-flex align-items-start justify-content-between" data-bs-toggle="tooltip"
-					title="Jumlah Data Training dengan nama duplikat">
+					title="Jumlah Data Training dengan ID Pelanggan duplikat">
 					<div class="content-left">
 						<span>Duplikat</span>
 						<div class="d-flex align-items-end mt-2">
@@ -162,48 +168,60 @@
 </div>
 <div class="card">
 	<div class="card-body">
-		<div class="btn-group mb-2" role="group">
+		<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
 			<div class="btn-group" role="group">
-				<button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
-					aria-expanded="false">
-					<i class="fas fa-plus"></i> Tambah Data
-					<i class="fa-solid fa-caret-down"></i>
+				<div class="btn-group" role="group">
+					<button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+						aria-expanded="false">
+						<i class="fas fa-plus"></i> Tambah Data
+						<i class="fa-solid fa-caret-down"></i>
+					</button>
+					<ul class="dropdown-menu">
+						<li>
+							<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalAddTraining">
+								<i class="fas fa-pen"></i> Input Manual
+							</a>
+						</li>
+						<li>
+							<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalImportTraining">
+								<i class="fas fa-upload"></i> Upload File
+							</a>
+						</li>
+					</ul>
+				</div>
+				<button type="button" class="btn btn-danger" id="delete-all" disabled>
+					<i class="fas fa-trash"></i> Hapus Data
 				</button>
-				<ul class="dropdown-menu">
-					<li>
-						<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalAddTraining">
-							<i class="fas fa-pen"></i> Input Manual
-						</a>
-					</li>
-					<li>
-						<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalImportTraining">
-							<i class="fas fa-upload"></i> Upload File
-						</a>
-					</li>
-				</ul>
+				<a href="{{route('training.export')}}" class="btn btn-success disabled" id="dlBtn">
+					<i class="fas fa-download"></i> Ekspor
+				</a>
 			</div>
-			<button type="button" class="btn btn-danger" id="delete-all" disabled>
-				<i class="fas fa-trash"></i> Hapus Data
-			</button>
-			<a href="{{route('training.export')}}" class="btn btn-success disabled" id="dlBtn">
-				<i class="fas fa-download"></i> Ekspor
-			</a>
+			<div class="input-group" style="max-width: 300px;">
+				<span class="input-group-text"><i class="fas fa-search"></i></span>
+				<input type="text" class="form-control" id="training-search" placeholder="Cari data...">
+				<button class="btn btn-outline-secondary" type="button" id="training-clear" aria-label="Clear search">
+					<i class="fas fa-xmark"></i>
+				</button>
+			</div>
 		</div>
-		<table class="table table-bordered" id="table-training" width="100%">
-			<thead>
-				<tr>
-					<th>#</th>
-					<th>Nama</th>
-					@foreach ($atribut as $attr)
-					<th data-bs-toggle="tooltip" title="{{$attr->desc}}">
-						{{$attr->name}}
-					</th>
-					@endforeach
-					<th>Status</th>
-					<th>Aksi</th>
-				</tr>
-			</thead>
-		</table>
+		<div class="table-responsive">
+			<table class="table table-bordered nowrap" id="table-training" width="100%">
+				<thead>
+					<tr>
+						<th>#</th>
+						<th class="text-center">ID Pelanggan</th>
+						<th class="text-center">Nama</th>
+						@foreach ($atribut as $attr)
+						<th class="text-center" data-bs-toggle="tooltip" title="{{$attr->desc}}">
+							{{$attr->name}}
+						</th>
+						@endforeach
+						<th class="text-center">Status</th>
+						<th>Aksi</th>
+					</tr>
+				</thead>
+			</table>
+		</div>
 	</div>
 </div>
 @endsection
@@ -218,11 +236,14 @@
 				lengthChange: false,
 				serverSide: true,
 				processing: true,
-				responsive: true,
-				searching: false,
+				responsive: false,
+				scrollX: true,
+				searching: true,
+				dom: "rtip",
 				ajax: "{{ route('training.create') }}",
 				columns: [
 					{ data: "id" },
+					{ data: "id_pelanggan" },
 					{ data: "nama" },
 					@foreach ($atribut as $attr)
 					{ data: "{{$attr->slug}}" },
@@ -237,7 +258,7 @@
 				},
 				@foreach ($atribut as $attr)
 				{
-					targets: 2 + {{$loop->index}},
+					targets: 3 + {{$loop->index}},
 					render: function(data) {
 						return data??"?";
 					}
@@ -245,6 +266,7 @@
 				@endforeach
 				{ //Aksi
 					orderable: false,
+					responsivePriority: 1,
 					className: "text-center",
 					targets: -1,
 					render: function (data, type, full) {
@@ -287,6 +309,13 @@
 		} catch (dterr) {
 			initError(dterr.message);
 		}
+		$("#training-search").on("input", function () {
+			dt_training.search(this.value).draw();
+		});
+		$("#training-clear").on("click", function () {
+			$("#training-search").val("");
+			dt_training.search("").draw();
+		});
 	}).on("click", "#delete-all", function () {
 		iziToast.question({
 			timeout: 20000,
@@ -370,6 +399,7 @@
 		$.get(`training/${train_id}/edit`, function (data) {
 			$("#train_id").val(data.id);
 			$("#trainName").val(data.nama);
+			$("#trainCustomerId").val(data.id_pelanggan);
 			$('#trainResult').val(data.status);
 			@foreach($atribut as $attr)
 			$("#train-{{$attr->slug}}").val(data.{{$attr->slug}});
@@ -440,6 +470,10 @@
 					if (typeof xhr.responseJSON.errors.nama !== "undefined") {
 						$("#trainName").addClass("is-invalid");
 						$("#name-error").text(xhr.responseJSON.errors.nama);
+					}
+					if (typeof xhr.responseJSON.errors.id_pelanggan !== "undefined") {
+						$("#trainCustomerId").addClass("is-invalid");
+						$("#id-pelanggan-error").text(xhr.responseJSON.errors.id_pelanggan);
 					}
 					@foreach($atribut as $attr)
 					if (typeof xhr.responseJSON.errors.{{$attr->slug}} !== "undefined") {

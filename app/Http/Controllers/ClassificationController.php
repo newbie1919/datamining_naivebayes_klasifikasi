@@ -7,6 +7,7 @@ use App\Models\Classification;
 use App\Models\Probability;
 use App\Models\TestingData;
 use App\Models\TrainingData;
+use App\Support\ActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -55,14 +56,23 @@ class ClassificationController extends Controller
 			foreach ($semuadata as $dataset) {
 				$klasifikasi = ProbabLabel::hitungProbab($dataset);
 				Classification::updateOrCreate([
-					'name' => $dataset->nama, 'type' => $request->tipe
+					'type' => $request->tipe,
+					'id_pelanggan' => $dataset->id_pelanggan,
+					'daya_terpasang' => $dataset->daya_terpasang
 				], [
+					'name' => $dataset->nama,
 					'true' => $klasifikasi['true'],
 					'false' => $klasifikasi['false'],
 					'predicted' => $klasifikasi['predict'],
-					'real' => $dataset->status
+					'real' => $dataset->status ?? null
 				]);
 			}
+			ActivityLogger::log(
+				'classification.calculated',
+				'Menjalankan klasifikasi untuk data ' . $request->tipe,
+				Classification::class,
+				['type' => $request->tipe]
+			);
 			return response()->json([
 				'message' => 'Berhasil dihitung', 'preprocess' => $pre ?? 0
 			]);
@@ -83,8 +93,47 @@ class ClassificationController extends Controller
 			})->editColumn('predicted', function (Classification $class) {
 				return ProbabLabel::$label[$class->predicted];
 			})->editColumn('real', function (Classification $class) {
-				return ProbabLabel::$label[$class->real];
+				return is_null($class->real) ? '-' : ProbabLabel::$label[$class->real];
 			})->make();
+	}
+	public function detail(Classification $classification)
+	{
+		if ($classification->type === 'train') {
+			$dataset = TrainingData::where('id_pelanggan', $classification->id_pelanggan)
+				->where('daya_terpasang', $classification->daya_terpasang)
+				->first();
+		} else {
+			$dataset = TestingData::where('id_pelanggan', $classification->id_pelanggan)
+				->where('daya_terpasang', $classification->daya_terpasang)
+				->first();
+		}
+		if (!$dataset) {
+			return response()->json(['message' => 'Data sumber klasifikasi tidak ditemukan'], 404);
+		}
+		$detail = ProbabLabel::explainProbab($dataset);
+		$totalTrain = TrainingData::count();
+		$totalLayak = TrainingData::where('status', true)->count();
+		$totalTidakLayak = TrainingData::where('status', false)->count();
+		return response()->json([
+			'meta' => [
+				'nama' => $classification->name,
+				'id_pelanggan' => $classification->id_pelanggan,
+				'daya_terpasang' => $classification->daya_terpasang,
+				'type' => Classification::$tipedata[$classification->type],
+				'predicted' => ProbabLabel::$label[$classification->predicted],
+				'real' => is_null($classification->real) ? '-' : ProbabLabel::$label[$classification->real]
+			],
+			'prior_count' => [
+				'total' => $totalTrain,
+				'true' => $totalLayak,
+				'false' => $totalTidakLayak
+			],
+			'formula' => [
+				'posterior' => 'P(Y|X) = (P(Y) * Π P(xi|Y)) / P(X)',
+				'gaussian' => 'P(x|Y) = (1 / (sd * sqrt(2π))) * exp(-0.5 * ((x-mean)/sd)^2)'
+			],
+			'detail' => $detail
+		]);
 	}
 
 	/**
@@ -96,6 +145,12 @@ class ClassificationController extends Controller
 		try {
 			if ($request->tipe === 'all') Classification::truncate();
 			else Classification::where('type', $request->tipe)->delete();
+			ActivityLogger::log(
+				'classification.reset',
+				'Mereset hasil klasifikasi untuk data ' . $request->tipe,
+				Classification::class,
+				['type' => $request->tipe]
+			);
 			return response()->json(['message' => 'Berhasil direset']);
 		} catch (QueryException $e) {
 			Log::error($e);

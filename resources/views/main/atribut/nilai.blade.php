@@ -194,7 +194,7 @@
 						headers: { "X-CSRF-TOKEN": "{{ csrf_token() }}" },
 						url: '/atribut/nilai/' + attr_id,
 						complete: function(){
-							$.LoadingOverlay('show');
+							$.LoadingOverlay('hide');
 						}, success: function () {
 							dt_atribut.draw();
 							iziToast.success({title: "Berhasil dihapus",displayMode: 2});

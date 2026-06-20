@@ -11,6 +11,8 @@ class TrainingData extends Model
 	protected $guarded = ['id', 'created_at', 'updated_at'];
 	public static array $rules = [
 		'nama' => ['bail', 'required', 'string'],
+		'id_pelanggan' => ['bail', 'required', 'string', 'max:50'],
+		'daya_terpasang' => ['bail', 'nullable', 'integer', 'min:1'],
 		'status' => ['bail', 'required', 'boolean'],
 		'q' => 'required',
 		'q.*' => ['bail', 'required', 'numeric']

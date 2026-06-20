@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Atribut;
 use App\Models\NilaiAtribut;
+use App\Support\ActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -57,14 +58,16 @@ class NilaiAtributController extends Controller
 		try {
 			$request->validate(NilaiAtribut::$rules);
 			if (!empty($request->id)) {
-				NilaiAtribut::updateOrCreate(['id' => $request->id], [
+				$nilai = NilaiAtribut::updateOrCreate(['id' => $request->id], [
 					'name' => $request->name, 'atribut_id' => $request->atribut_id
 				]);
+				ActivityLogger::log('attribute_value.updated', 'Mengubah nilai atribut ' . $nilai->name, $nilai);
 				return response()->json(['message' => 'Berhasil diedit']);
 			} else {
-				NilaiAtribut::create([
+				$nilai = NilaiAtribut::create([
 					'name' => $request->name, 'atribut_id' => $request->atribut_id
 				]);
+				ActivityLogger::log('attribute_value.created', 'Menambahkan nilai atribut ' . $nilai->name, $nilai);
 				return response()->json(['message' => 'Berhasil disimpan']);
 			}
 		} catch (QueryException $th) {
@@ -86,6 +89,7 @@ class NilaiAtributController extends Controller
 	 */
 	public function destroy(NilaiAtribut $nilai)
 	{
+		ActivityLogger::log('attribute_value.deleted', 'Menghapus nilai atribut ' . $nilai->name, $nilai);
 		$nilai->delete();
 		return response()->json(['message' => 'Berhasil dihapus']);
 	}

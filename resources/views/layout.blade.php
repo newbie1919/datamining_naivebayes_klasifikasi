@@ -3,7 +3,7 @@
 
 <head>
 	<title>
-		@yield('title') | Aplikasi Klasifikasi Kelayakan Calon Penerima Bansos
+		@yield('title') | Aplikasi Klasifikasi Penerima Subsidi Listrik
 	</title>
 	<!-- Favicons -->
 	<link rel="apple-touch-icon" href="{{asset('assets/img/favicon/apple-touch-icon.png')}}" sizes="180x180">
@@ -70,12 +70,28 @@
 </head>
 
 <body>
+	@php
+		$user = auth()->user();
+		$isAdmin = $user?->isAdmin();
+		$isPetugas = $user?->isPetugas();
+		$isPimpinan = $user?->isPimpinan();
+		$canManageUsers = $user?->hasPermission('manage_users');
+		$canManageRolePermissions = $user?->hasPermission('manage_role_permissions');
+		$canViewActivityLogs = $user?->hasPermission('view_activity_logs');
+		$canManageAttributes = $user?->hasPermission('manage_attributes');
+		$canManageTrainingData = $user?->hasPermission('manage_training_data');
+		$canManageTestingData = $user?->hasPermission('manage_testing_data');
+		$canManageProbabilities = $user?->hasPermission('manage_probabilities');
+		$canRunClassification = $user?->hasPermission('run_classification');
+		$canViewReports = $user?->hasPermission('view_reports');
+		$accountMenuOpen = request()->routeIs('admin.accounts.*');
+	@endphp
 	<nav class="navbar navbar-dark navbar-theme-primary px-4 col-12 d-lg-none">
 		<a class="navbar-brand me-lg-5" href="{{route('home')}}">
-			<img class="navbar-brand-dark" src="{{asset('assets/img/data-mining_8438890.png')}}"
-				alt="Data Mining logo" />
-			<img class="navbar-brand-light" src="{{asset('assets/img/data-mining_8438890.png')}}"
-				alt="Data Mining logo" />
+			<img class="navbar-brand-dark" src="https://upload.wikimedia.org/wikipedia/commons/9/97/Logo_PLN.png"
+				alt="Logo PLN" />
+			<img class="navbar-brand-light" src="https://upload.wikimedia.org/wikipedia/commons/9/97/Logo_PLN.png"
+				alt="Logo PLN" />
 		</a>
 		<div class="d-flex align-items-center">
 			<button class="navbar-toggler d-lg-none collapsed" type="button" data-bs-toggle="collapse"
@@ -87,15 +103,10 @@
 	</nav>
 	<nav id="sidebarMenu" class="sidebar d-lg-block bg-gray-800 text-white collapse" data-simplebar>
 		<div class="sidebar-inner px-2 pt-3">
-			<div class="user-card d-flex align-items-center justify-content-between justify-content-lg-center pb-4">
-				<div class="d-flex align-items-center">
-					<div class="avatar-lg me-4">
-						<img src="{{asset('assets/img/data-mining_8438890.png')}}" height="20" width="20"
-							alt="Logo Data Mining">
-					</div>
-					<div class="d-block">
-						<h2 class="h5 mb-3">Data Mining</h2>
-					</div>
+			<div class="user-card d-flex flex-column align-items-center justify-content-center pb-4 text-center">
+				<div class="avatar-lg d-flex align-items-center justify-content-center mb-2">
+					<img src="https://upload.wikimedia.org/wikipedia/commons/9/97/Logo_PLN.png" height="56" width="56"
+						alt="Logo PLN">
 				</div>
 				<div class="collapse-close d-md-none">
 					<a href="#sidebarMenu" data-bs-toggle="collapse" data-bs-target="#sidebarMenu"
@@ -118,6 +129,7 @@
 						</span>
 					</a>
 				</li>
+				@if($canManageAttributes)
 				<li @class(["nav-item", 'active'=>Request::segment(1)=='atribut'&&empty(Request::segment(2))])>
 					<a href="{{route('atribut.index')}}" class="nav-link d-flex justify-content-between">
 						<span>
@@ -134,41 +146,8 @@
 						</span>
 					</a>
 				</li>
-				<li class="nav-item">
-					<span @class(['nav-link','collapsed'=>
-						in_array(request()->segment(1),['training','testing']),
-						'd-flex','justify-content-between','align-items-center'])
-						data-bs-toggle="collapse" data-bs-target="#submenu-dataset">
-						<span>
-							<span class="sidebar-icon"><i class="fas fa-database"></i></span>
-							<span class="sidebar-text">Dataset</span>
-						</span>
-						<span class="link-arrow">
-							<svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20"
-								xmlns="http://www.w3.org/2000/svg">
-								<path fill-rule="evenodd"
-									d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-									clip-rule="evenodd"></path>
-							</svg>
-						</span>
-					</span>
-					<div @class(["multi-level", "collapse" , 'show'=>
-						in_array(request()->segment(1),['training','testing'])]) role="list"
-						id="submenu-dataset" aria-expanded="false">
-						<ul class="flex-column nav">
-							<li @class(["nav-item", 'active'=> Request::segment(1) == 'training'])>
-								<a class="nav-link" href="{{route('training.index')}}">
-									<span class="sidebar-text">Data Training</span>
-								</a>
-							</li>
-							<li @class(["nav-item", 'active'=> Request::segment(1) == 'testing'])>
-								<a class="nav-link" href="{{route('testing.index')}}">
-									<span class="sidebar-text">Data Testing</span>
-								</a>
-							</li>
-						</ul>
-					</div>
-				</li>
+				@endif
+				@if($canManageProbabilities || $canRunClassification)
 				<li class="nav-item">
 					<span @class(['nav-link','collapsed'=>
 						in_array(request()->segment(1),['probab','class']),'d-flex',
@@ -191,27 +170,154 @@
 						in_array(request()->segment(1),['probab','class'])])
 						role="list" id="submenu-naivebayes" aria-expanded="false">
 						<ul class="flex-column nav">
+							@if($canManageProbabilities)
 							<li @class(["nav-item", 'active'=> Request::segment(1) == 'probab'])>
 								<a class="nav-link" href="{{ route('probab.index') }}">
 									<span class="sidebar-text">Probabilitas</span>
 								</a>
 							</li>
+							@endif
+							@if($canRunClassification)
 							<li @class(["nav-item", 'active'=> Request::segment(1) == 'class'])>
 								<a class="nav-link" href="{{route('class.index')}}">
 									<span class="sidebar-text">Klasifikasi</span>
 								</a>
 							</li>
+							@endif
 						</ul>
 					</div>
 				</li>
-				<li @class(["nav-item",'active'=>request()->segment(1)=='result'])>
-					<a href="{{route('result')}}" class="nav-link d-flex justify-content-between">
+				@endif
+				@if($canManageTrainingData || $canManageTestingData)
+				<li class="nav-item">
+					<span @class(['nav-link','collapsed'=>
+						in_array(request()->segment(1),['training','testing']),
+						'd-flex','justify-content-between','align-items-center'])
+						data-bs-toggle="collapse" data-bs-target="#submenu-dataset">
+						<span>
+							<span class="sidebar-icon"><i class="fas fa-database"></i></span>
+							<span class="sidebar-text">Dataset</span>
+						</span>
+						<span class="link-arrow">
+							<svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20"
+								xmlns="http://www.w3.org/2000/svg">
+								<path fill-rule="evenodd"
+									d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+									clip-rule="evenodd"></path>
+							</svg>
+						</span>
+					</span>
+					<div @class(["multi-level", "collapse" , 'show'=>
+						in_array(request()->segment(1),['training','testing'])]) role="list"
+						id="submenu-dataset" aria-expanded="false">
+						<ul class="flex-column nav">
+							@if($canManageTrainingData)
+							<li @class(["nav-item", 'active'=> Request::segment(1) == 'training'])>
+								<a class="nav-link" href="{{route('training.index')}}">
+									<span class="sidebar-text">Data Training</span>
+								</a>
+							</li>
+							@endif
+							@if($canManageTestingData)
+							<li @class(["nav-item", 'active'=> Request::segment(1) == 'testing'])>
+								<a class="nav-link" href="{{route('testing.index')}}">
+									<span class="sidebar-text">Data Testing</span>
+								</a>
+							</li>
+							@endif
+						</ul>
+					</div>
+				</li>
+				@endif
+				@if(!$canManageAttributes && $canManageTestingData)
+				<li @class(["nav-item", 'active'=> Request::segment(1) == 'testing'])>
+					<a href="{{route('testing.index')}}" class="nav-link d-flex justify-content-between">
+						<span>
+							<span class="sidebar-icon"><i class="fas fa-database"></i></span>
+							<span class="sidebar-text">Data Testing</span>
+						</span>
+					</a>
+				</li>
+				@endif
+				@if(!$canManageAttributes && $canRunClassification)
+				<li @class(["nav-item", 'active'=> Request::segment(1) == 'class'])>
+					<a href="{{route('class.index')}}" class="nav-link d-flex justify-content-between">
+						<span>
+							<span class="sidebar-icon"><i class="fas fa-calculator"></i></span>
+							<span class="sidebar-text">Klasifikasi</span>
+						</span>
+					</a>
+				</li>
+				@endif
+				@if($canViewReports)
+				<li @class(["nav-item",'active'=>
+					request()->segment(1) == 'result' &&
+					request()->segment(2) == null])>
+					<a href="{{ route('result.index') }}" class="nav-link d-flex justify-content-between">
 						<span>
 							<span class="sidebar-icon"><i class="fas fa-chart-line"></i></span>
 							<span class="sidebar-text">Performa</span>
 						</span>
 					</a>
 				</li>
+				<li @class(["nav-item",'active'=>
+					request()->segment(1) == 'result' &&
+					request()->segment(2) == 'report' &&
+					request()->segment(3) == 'classification'])>
+					<a href="{{ route('result.report') }}" class="nav-link d-flex justify-content-between">
+						<span>
+							<span class="sidebar-icon"><i class="fas fa-file-lines"></i></span>
+							<span class="sidebar-text">Laporan</span>
+						</span>
+					</a>
+				</li>
+				@endif
+				@if($canManageUsers || $canManageRolePermissions || $canViewActivityLogs)
+				<li class="nav-item">
+					<span @class(['nav-link', 'collapsed' => $accountMenuOpen, 'd-flex',
+						'justify-content-between', 'align-items-center'])
+						data-bs-toggle="collapse" data-bs-target="#submenu-accounts">
+						<span>
+							<span class="sidebar-icon"><i class="fas fa-users-gear"></i></span>
+							<span class="sidebar-text">Manajemen Akun</span>
+						</span>
+						<span class="link-arrow">
+							<svg class="icon icon-sm" fill="currentColor" viewBox="0 0 20 20"
+								xmlns="http://www.w3.org/2000/svg">
+								<path fill-rule="evenodd"
+									d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+									clip-rule="evenodd"></path>
+							</svg>
+						</span>
+					</span>
+					<div @class(["multi-level", "collapse", 'show' => $accountMenuOpen]) role="list"
+						id="submenu-accounts" aria-expanded="false">
+						<ul class="flex-column nav">
+							@if($canManageUsers)
+							<li @class(["nav-item", 'active' => request()->routeIs('admin.accounts.users')])>
+								<a class="nav-link" href="{{ route('admin.accounts.users') }}">
+									<span class="sidebar-text">Daftar Pengguna</span>
+								</a>
+							</li>
+							@endif
+							@if($canManageRolePermissions)
+							<li @class(["nav-item", 'active' => request()->routeIs('admin.accounts.permissions')])>
+								<a class="nav-link" href="{{ route('admin.accounts.permissions') }}">
+									<span class="sidebar-text">Hak Akses & Peran</span>
+								</a>
+							</li>
+							@endif
+							@if($canViewActivityLogs)
+							<li @class(["nav-item", 'active' => request()->routeIs('admin.accounts.activity-logs')])>
+								<a class="nav-link" href="{{ route('admin.accounts.activity-logs') }}">
+									<span class="sidebar-text">Log Aktivitas</span>
+								</a>
+							</li>
+							@endif
+						</ul>
+					</div>
+				</li>
+				@endif
 				<li role="separator" class="dropdown-divider mt-4 mb-3 border-gray-700"></li>
 				<li class="nav-item">
 					<a href="{{route('logout')}}" class="nav-link d-flex align-items-center" id="logout-btn">
@@ -249,8 +355,9 @@
 								<div class="media d-flex align-items-center">
 									<div class="media-body ms-2 text-dark align-items-center">
 										<span class="mb-0 font-small fw-bold text-gray-900" id="nama-pengguna">
-											{{auth()->user()->name}}
+											{{ $user?->name }}
 										</span>
+										<div class="small text-gray-600">{{ $user?->getRoleLabel() }}</div>
 									</div>
 								</div>
 							</a>
@@ -284,14 +391,10 @@
 		@yield('content')
 		<footer class="bg-white rounded shadow p-5 mb-4 mt-4">
 			<div class="row">
-				<div class="col-12 col-md-4 col-xl-6 mb-4 mb-md-0">
-					<p class="mb-0 text-center text-lg-start">
+				<div class="col-12">
+					<p class="mb-0 text-center">
 						© <span class="current-year"></span> Naive Bayes Data Mining
 					</p>
-				</div>
-				<div class="col-12 col-md-8 col-xl-6 text-center text-lg-start">
-					Template oleh <a class="text-primary fw-normal" href="https://themesberg.com"
-						target="_blank">Themesberg</a> & <a href="https://updivision.com/" target="_blank">Updivision</a>
 				</div>
 			</div>
 		</footer>

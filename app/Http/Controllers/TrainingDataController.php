@@ -8,6 +8,7 @@ use App\Models\Atribut;
 use App\Models\Classification;
 use App\Models\NilaiAtribut;
 use App\Models\TrainingData;
+use App\Support\ActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -26,12 +27,19 @@ class TrainingDataController extends Controller
 	{ //Upload Data Training
 		$request->validate(TrainingData::$filerule);
 		Excel::import(new TrainingImport, $request->file('data'));
+		ActivityLogger::log('training.imported', 'Mengunggah data training baru', TrainingData::class, [
+			'filename' => $request->file('data')?->getClientOriginalName(),
+		]);
 		return response()->json(['message' => 'Berhasil diimpor']);
 	}
 	public function count()
-	{ //Tampilkan jumlah nilai yang hilang dan data dengan nama duplikat
+	{ //Tampilkan jumlah nilai yang hilang dan data duplikat berdasarkan ID pelanggan
 		$train = TrainingData::get();
-		$trainUnique = $train->unique(['nama']);
+		$trainUnique = $train->unique(function ($item) {
+			if (empty($item->id_pelanggan))
+				return 'legacy-' . $item->id;
+			return strtolower(trim($item->id_pelanggan));
+		});
 		$empty = 0;
 		foreach (Atribut::get() as $attr)
 			$empty += TrainingData::whereNull($attr->slug)->count();
@@ -81,13 +89,29 @@ class TrainingDataController extends Controller
 			$request->validate(TrainingData::$rules);
 			foreach ($request->q as $id => $q) $req[$id] = $q;
 			$req['nama'] = ucfirst($request->nama);
+			$req['id_pelanggan'] = strtoupper(trim($request->id_pelanggan));
+			$req['daya_terpasang'] = $request->filled('daya_terpasang') ? (int) $request->daya_terpasang : null;
 			$req['status'] = $request->status;
+
+			$duplikat = TrainingData::where('id_pelanggan', $req['id_pelanggan']);
+			if (!empty($request->id)) $duplikat->where('id', '!=', $request->id);
+			if ($duplikat->exists()) {
+				return response()->json([
+					'message' => 'ID Pelanggan sudah digunakan',
+					'errors' => [
+						'id_pelanggan' => ['ID Pelanggan sudah digunakan']
+					]
+				], 422);
+			}
+
 			ProbabLabel::resetProbab();
 			if (!empty($request->id)) {
-				TrainingData::updateOrCreate(['id' => $request->id], $req);
+				$data = TrainingData::updateOrCreate(['id' => $request->id], $req);
+				ActivityLogger::log('training.updated', 'Mengubah data training ' . $data->id_pelanggan, $data);
 				return response()->json(['message' => 'Berhasil diedit']);
 			} else {
-				TrainingData::create($req);
+				$data = TrainingData::create($req);
+				ActivityLogger::log('training.created', 'Menambahkan data training ' . $data->id_pelanggan, $data);
 				return response()->json(['message' => 'Berhasil disimpan']);
 			}
 		} catch (QueryException $e) {
@@ -109,8 +133,11 @@ class TrainingDataController extends Controller
 	 */
 	public function destroy(TrainingData $training)
 	{
-		Classification::where('name', $training->nama)->where('type', 'train')
+		Classification::where('type', 'train')
+			->where('id_pelanggan', $training->id_pelanggan)
+			->where('daya_terpasang', $training->daya_terpasang)
 			->delete();
+		ActivityLogger::log('training.deleted', 'Menghapus data training ' . $training->id_pelanggan, $training);
 		$training->delete();
 		ProbabLabel::resetProbab();
 		return response()->json(['message' => 'Berhasil dihapus']);
@@ -121,6 +148,7 @@ class TrainingDataController extends Controller
 			Classification::where('type', 'train')->delete();
 			ProbabLabel::resetProbab();
 			TrainingData::truncate();
+			ActivityLogger::log('training.cleared', 'Menghapus seluruh data training', TrainingData::class);
 			return response()->json(['message' => 'Berhasil dihapus']);
 		} catch (QueryException $e) {
 			return response()->json(['message' => $e->errorInfo[2]], 500);

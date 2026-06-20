@@ -3,7 +3,7 @@
 
 <head>
 	<title>
-		@yield('title') | Aplikasi Klasifikasi Kelayakan Calon Penerima Bansos
+		@yield('title') | Aplikasi Klasifikasi Penerima Subsidi Listrik
 	</title>
 	<!-- Favicons -->
 	<link rel="apple-touch-icon" href="{{asset('assets/img/favicon/apple-touch-icon.png')}}" sizes="180x180">

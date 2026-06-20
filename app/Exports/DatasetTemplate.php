@@ -19,6 +19,8 @@ implements FromGenerator, ShouldAutoSize, WithStrictNullComparison
 	public function generator(): Generator
 	{
 		$col[] = 'Nama';
+		$col[] = 'ID Pelanggan';
+		$col[] = 'Daya Terpasang';
 		$totalattr = array();
 		foreach (Atribut::get() as $attr) {
 			$totalattr[] = NilaiAtribut::where('atribut_id', $attr->id)->count();
@@ -28,6 +30,8 @@ implements FromGenerator, ShouldAutoSize, WithStrictNullComparison
 		yield $col;
 		for ($a = 0; $a < collect($totalattr)->max(); $a++) {
 			$val['nama'] = Auth::user()->name;
+			$val['id_pelanggan'] = 'PLG-' . str_pad((string) ($a + 1), 4, '0', STR_PAD_LEFT);
+			$val['daya_terpasang'] = [450, 900, 1300, 2200][$a % 4];
 			foreach (Atribut::get() as $attr) {
 				if ($attr->type === 'categorical') {
 					$subval = NilaiAtribut::where('atribut_id', $attr->id)->get();

@@ -17,6 +17,12 @@
 						<label for="testName">Nama</label>
 						<div class="invalid-feedback" id="name-error"></div>
 					</div>
+					<div class="form-floating mb-3">
+						<input type="text" class="form-control" id="testCustomerId" name="id_pelanggan"
+							placeholder="ID Pelanggan" required />
+						<label for="testCustomerId">ID Pelanggan</label>
+						<div class="invalid-feedback" id="id-pelanggan-error"></div>
+					</div>
 					@foreach ($atribut as $attr)
 					<div class="form-floating mb-3" data-bs-toggle="tooltip" title="{{$attr->desc}}">
 						@if ($attr->type === 'numeric')
@@ -34,18 +40,6 @@
 						<div class="invalid-feedback" id="{{$attr->slug}}-error"></div>
 					</div>
 					@endforeach
-					<div class="form-floating mb-3">
-						<select name="status" class="form-select" id="testResult" required>
-							<option value="">Pilih</option>
-							<option value="1">{{$hasil[true]}}</option>
-							<option value="0">{{$hasil[false]}}</option>
-							<option value="auto" @if($calculated===0) disabled @endif>
-								Pilih otomatis
-							</option>
-						</select>
-						<label for="testResult">Status</label>
-						<div class="invalid-feedback" id="result-error"></div>
-					</div>
 				</form>
 			</div>
 			<div class="modal-footer">
@@ -127,7 +121,7 @@
 		<div class="card">
 			<div class="card-body">
 				<div class="d-flex align-items-start justify-content-between" data-bs-toggle="tooltip"
-					title="Jumlah Data Testing dengan nama duplikat">
+					title="Jumlah Data Testing dengan ID Pelanggan duplikat">
 					<div class="content-left">
 						<span>Duplikat</span>
 						<div class="d-flex align-items-end mt-2">
@@ -162,48 +156,59 @@
 </div>
 <div class="card">
 	<div class="card-body">
-		<div class="btn-group mb-2" role="group">
+		<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
 			<div class="btn-group" role="group">
-				<button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
-					aria-expanded="false">
-					<i class="fas fa-plus"></i> Tambah Data
-					<i class="fa-solid fa-caret-down"></i>
+				<div class="btn-group" role="group">
+					<button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+						aria-expanded="false">
+						<i class="fas fa-plus"></i> Tambah Data
+						<i class="fa-solid fa-caret-down"></i>
+					</button>
+					<ul class="dropdown-menu">
+						<li>
+							<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalAddTesting">
+								<i class="fas fa-pen"></i> Input Manual
+							</a>
+						</li>
+						<li>
+							<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalImportTesting">
+								<i class="fas fa-upload"></i> Upload File
+							</a>
+						</li>
+					</ul>
+				</div>
+				<button type="button" class="btn btn-danger" id="delete-all" disabled>
+					<i class="fas fa-trash"></i> Hapus Data
 				</button>
-				<ul class="dropdown-menu">
-					<li>
-						<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalAddTesting">
-							<i class="fas fa-pen"></i> Input Manual
-						</a>
-					</li>
-					<li>
-						<a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalImportTesting">
-							<i class="fas fa-upload"></i> Upload File
-						</a>
-					</li>
-				</ul>
+				<a href="{{route('testing.export')}}" class="btn btn-success disabled" id="dlBtn">
+					<i class="fas fa-download"></i> Ekspor
+				</a>
 			</div>
-			<button type="button" class="btn btn-danger" id="delete-all" disabled>
-				<i class="fas fa-trash"></i> Hapus Data
-			</button>
-			<a href="{{route('testing.export')}}" class="btn btn-success disabled" id="dlBtn">
-				<i class="fas fa-download"></i> Ekspor
-			</a>
+			<div class="input-group" style="max-width: 300px;">
+				<span class="input-group-text"><i class="fas fa-search"></i></span>
+				<input type="text" class="form-control" id="testing-search" placeholder="Cari data...">
+				<button class="btn btn-outline-secondary" type="button" id="testing-clear" aria-label="Clear search">
+					<i class="fas fa-xmark"></i>
+				</button>
+			</div>
 		</div>
-		<table class="table table-bordered" id="table-testing" style="width: 100%">
-			<thead>
-				<tr>
-					<th>#</th>
-					<th>Nama</th>
-					@foreach ($atribut as $attr)
-					<th data-bs-toggle="tooltip" title="{{$attr->desc}}">
-						{{$attr->name}}
-					</th>
-					@endforeach
-					<th>Status</th>
-					<th>Aksi</th>
-				</tr>
-			</thead>
-		</table>
+		<div class="table-responsive">
+			<table class="table table-bordered nowrap" id="table-testing" style="width: 100%">
+				<thead>
+					<tr>
+						<th>#</th>
+						<th class="text-center">ID Pelanggan</th>
+						<th class="text-center">Nama</th>
+						@foreach ($atribut as $attr)
+						<th class="text-center" data-bs-toggle="tooltip" title="{{$attr->desc}}">
+							{{$attr->name}}
+						</th>
+						@endforeach
+						<th>Aksi</th>
+					</tr>
+				</thead>
+			</table>
+		</div>
 	</div>
 </div>
 @endsection
@@ -218,16 +223,18 @@
 				lengthChange: false,
 				serverSide: true,
 				processing: true,
-				responsive: true,
-				searching: false,
+				responsive: false,
+				scrollX: true,
+				searching: true,
+				dom: "rtip",
 				ajax: "{{ route('testing.create') }}",
 				columns: [
 					{ data: "id" },
+					{ data: "id_pelanggan" },
 					{ data: "nama" },
 					@foreach ($atribut as $attr)
 					{ data: "{{$attr->slug}}" },
 					@endforeach
-					{ data: "status" },
 					{ data: "id" }
 				], columnDefs: [{
 					targets: 0,
@@ -237,7 +244,7 @@
 				},
 				@foreach ($atribut as $attr)
 				{
-					targets: 1 + {{$loop->index}},
+					targets: 3 + {{$loop->index}},
 					render: function(data) {
 						return data??"?";
 					}
@@ -245,6 +252,7 @@
 				@endforeach
 				{ //Aksi
 					orderable: false,
+					responsivePriority: 1,
 					className: "text-center",
 					targets: -1,
 					render: function (data, type, full) {
@@ -287,6 +295,13 @@
 		} catch (dterr) {
 			initError(dterr.message);
 		}
+		$("#testing-search").on("input", function () {
+			dt_testing.search(this.value).draw();
+		});
+		$("#testing-clear").on("click", function () {
+			$("#testing-search").val("");
+			dt_testing.search("").draw();
+		});
 	}).on("click", "#delete-all", function () {
 		iziToast.question({
 			timeout: 20000,
@@ -369,7 +384,7 @@
 		$.get(`testing/${test_id}/edit`, function (data) {
 			$("#test_id").val(data.id);
 			$("#testName").val(data.nama);
-			$('#testResult').val(data.status);
+			$("#testCustomerId").val(data.id_pelanggan);
 			@foreach($atribut as $attr)
 			$("#test-{{$attr->slug}}").val(data.{{$attr->slug}});
 			@endforeach
@@ -440,22 +455,18 @@
 						$("#testName").addClass("is-invalid");
 						$("#name-error").text(xhr.responseJSON.errors.nama);
 					}
+					if (typeof xhr.responseJSON.errors.id_pelanggan !== "undefined") {
+						$("#testCustomerId").addClass("is-invalid");
+						$("#id-pelanggan-error").text(xhr.responseJSON.errors.id_pelanggan);
+					}
 					@foreach($atribut as $attr)
 					if (typeof xhr.responseJSON.errors.{{$attr->slug}} !== "undefined") {
 						$("#test-{{$attr->slug}}").addClass("is-invalid");
 						$("#{{$attr->slug}}-error").text(xhr.responseJSON.errors.{{$attr->slug}});
 					}
 					@endforeach
-					if (typeof xhr.responseJSON.errors.status !== "undefined") {
-						$("#testResult").addClass("is-invalid");
-						$("#result-error").text(xhr.responseJSON.errors.status);
-					}
 					errmsg = xhr.responseJSON.message;
 					modalForm.modal("handleUpdate");
-				} else if(xhr.status === 400) {
-					$("#testResult").addClass("is-invalid");
-					$("#result-error").text("Probabilitas belum dihitung");
-					errmsg=xhr.responseJSON.message;
 				}	else {
 					console.warn(xhr.responseJSON.message ?? st);
 					errmsg = `Kesalahan HTTP ${xhr.status} ${xhr.statusText}`;

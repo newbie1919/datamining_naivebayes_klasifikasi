@@ -1,6 +1,11 @@
 @extends('layout')
 @section('title','Probabilitas')
 @section('content')
+<style>
+	.table thead th {
+		background-color: #cfccdb !important;
+	}
+</style>
 <div class="btn-group" role="button">
 	<a href="{{route('probab.create')}}" class="btn btn-primary">
 		<i class="fas fa-calculator"></i> Hitung

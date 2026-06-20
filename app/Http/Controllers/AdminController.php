@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Classification;
 use App\Models\TestingData;
 use App\Models\TrainingData;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -18,10 +20,61 @@ class AdminController extends Controller
 {
 	public function index()
 	{ //Halaman Dashboard
+		$train = TrainingData::count();
+		$test = TestingData::count();
+		$total = $test + $train;
+		$classTestTotal = Classification::where('type', 'test')->whereNotNull('real')->count();
+		$tp = Classification::where('type', 'test')->whereNotNull('real')->where('predicted', true)->where('real', true)->count();
+		$fp = Classification::where('type', 'test')->whereNotNull('real')->where('predicted', true)->where('real', false)->count();
+		$fn = Classification::where('type', 'test')->whereNotNull('real')->where('predicted', false)->where('real', true)->count();
+		$tn = Classification::where('type', 'test')->whereNotNull('real')->where('predicted', false)->where('real', false)->count();
+		if ($classTestTotal === 0) {
+			$accuracy = $precision = $recall = $f1 = 0;
+		} else {
+			$accuracy = (($tp + $tn) / $classTestTotal) * 100;
+			$precision = ($tp + $fp) === 0 ? 0 : ($tp / ($tp + $fp)) * 100;
+			$recall = ($tp + $fn) === 0 ? 0 : ($tp / ($tp + $fn)) * 100;
+			$f1 = ($precision + $recall) === 0 ? 0 : 2 * ($precision * $recall) / ($precision + $recall);
+		}
+
+		$days = collect(range(6, 0))->map(function ($minusDays) {
+			return Carbon::now()->subDays($minusDays)->format('Y-m-d');
+		});
+		$trendLabels = $days->map(function ($date) {
+			return Carbon::parse($date)->format('d M');
+		})->values()->toArray();
+		$trendValues = $days->map(function ($date) {
+			return Classification::whereDate('created_at', $date)->count();
+		})->values()->toArray();
+
 		$data = [
-			'test' => TestingData::count(),
-			'train' => TrainingData::count(),
-			'total' => TestingData::count() + TrainingData::count()
+			'test' => $test,
+			'train' => $train,
+			'total' => $total,
+			'classDist' => [
+				'labels' => ['Layak', 'Tidak Layak'],
+				'train' => [
+					TrainingData::where('status', true)->count(),
+					TrainingData::where('status', false)->count()
+				],
+				'test' => [
+					TestingData::where('status', true)->count(),
+					TestingData::where('status', false)->count()
+				]
+			],
+			'modelPerf' => [
+				'labels' => ['Accuracy', 'Precision', 'Recall', 'F1-score'],
+				'values' => [
+					round($accuracy, 2),
+					round($precision, 2),
+					round($recall, 2),
+					round($f1, 2)
+				]
+			],
+			'trend' => [
+				'labels' => $trendLabels,
+				'values' => $trendValues
+			]
 		];
 		return view('main.index', $data);
 	}

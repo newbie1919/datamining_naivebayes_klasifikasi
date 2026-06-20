@@ -19,6 +19,8 @@ implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStrict
 	{
 		$col[] = '#';
 		$col[] = "Nama";
+		$col[] = "ID Pelanggan";
+		$col[] = "Daya Terpasang";
 		foreach (Atribut::get() as $value) $col[] = $value->name;
 		$col[] = "Status";
 		return $col;
@@ -34,6 +36,8 @@ implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStrict
 	{
 		$row[] = $train->id;
 		$row[] = $train->nama;
+		$row[] = $train->id_pelanggan;
+		$row[] = $train->daya_terpasang;
 		foreach (Atribut::get() as $val) {
 			if ($val->type === 'categorical') {
 				$foreign = NilaiAtribut::firstWhere('id', $train[$val->slug]);

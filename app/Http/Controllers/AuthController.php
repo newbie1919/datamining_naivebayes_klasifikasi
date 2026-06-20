@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Database\QueryException;
@@ -29,6 +30,9 @@ class AuthController extends Controller
 			$req['password'] = Hash::make($req['password']);
 			$req['name'] = ucfirst($req['name']);
 			$req['email'] = strtolower($req['email']);
+			$req['role_id'] = Role::query()
+				->where('name', User::ROLE_PETUGAS)
+				->value('id') ?? 2;
 			User::create($req);
 			return to_route('login')->withSuccess('Akun berhasil dibuat');
 		} catch (QueryException $e) {
@@ -47,6 +51,11 @@ class AuthController extends Controller
 		$credentials = $request->validate(User::$loginrules);
 		if (Auth::attempt($credentials, $request->get('remember'))) {
 			$user = User::firstWhere('email', $request->email);
+			if (!$user?->is_active) {
+				Auth::logout();
+				return back()->onlyInput('email')
+					->withError('Akun Anda sedang dinonaktifkan oleh admin.');
+			}
 			Auth::login($user, $request->get('remember'));
 			Session::regenerate();
 			return to_route('home');
